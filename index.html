@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>PLANWISE</title>
+  <style>
+    body {
+      background-color: #f5f5dc;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .datetime {
+      font-weight: bold;
+    }
+
+    main {
+      display: flex;
+      margin-top: 20px;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .left, .right {
+      flex: 1;
+      min-width: 300px;
+      background: #fffaf0;
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    textarea, input[type="datetime-local"] {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #deb887;
+      border: none;
+      color: white;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+
+    #notification {
+      background: #ffe4b5;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #aaa;
+    }
+
+    .note {
+      margin-bottom: 10px;
+    }
+
+    .note textarea {
+      height: 50px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>PLANWISE</h1>
+      <div class="datetime" id="datetime"></div>
+    </header>
+
+    <main>
+      <div class="left">
+        <h2>Mục tiêu hôm nay</h2>
+        <textarea id="goalInput" placeholder="Nhập mục tiêu..."></textarea>
+        <input type="datetime-local" id="goalDeadline" />
+        <button onclick="saveGoal()">Lưu mục tiêu</button>
+
+        <div id="notification" class="hidden">
+          ⏰ Đến thời hạn hoàn thành mục tiêu!
+          <button onclick="dismissNotification()">X</button>
+        </div>
+
+        <h3>Lịch sử mục tiêu</h3>
+        <table id="goalHistory">
+          <thead>
+            <tr>
+              <th>Mục tiêu</th>
+              <th>Thời gian lưu</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="right">
+        <h2>Ghi chú theo tuần</h2>
+        <div id="noteContainer"></div>
+        <button onclick="saveNotes()">Lưu ghi chú tuần</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Cập nhật thời gian thực theo giờ Việt Nam (GMT+7)
+    function updateDateTime() {
+      const now = new Date();
+      const vietnamTime = new Date(now.getTime() + 7 * 3600000);
+      document.getElementById("datetime").innerText = vietnamTime.toLocaleString("vi-VN");
+    }
+    setInterval(updateDateTime, 1000);
+
+    // Lưu mục tiêu
+    function saveGoal() {
+      const goal = document.getElementById("goalInput").value;
+      const deadlineInput = document.getElementById("goalDeadline").value;
+
+      if (!goal || !deadlineInput) {
+        alert("Vui lòng nhập mục tiêu và thời hạn!");
+        return;
+      }
+
+      const deadline = new Date(deadlineInput);
+      const savedTime = new Date().toLocaleString("vi-VN");
+      const table = document.querySelector("#goalHistory tbody");
+
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${goal}</td><td>${savedTime}</td>`;
+      table.appendChild(row);
+
+      localStorage.setItem("goalHistory", table.innerHTML);
+      scheduleNotification(deadline);
+
+      document.getElementById("goalInput").value = "";
+      document.getElementById("goalDeadline").value = "";
+    }
+
+    function scheduleNotification(deadline) {
+      const now = new Date();
+      const delay = deadline.getTime() - now.getTime();
+
+      if (delay > 0) {
+        setTimeout(showNotification, delay);
+      }
+    }
+
+    function showNotification() {
+      document.getElementById("notification").classList.remove("hidden");
+
+      if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+          new Notification("PLANWISE", { body: "Đã đến hạn hoàn thành mục tiêu!" });
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission().then((permission) => {
+            if (permission === "granted") {
+              new Notification("PLANWISE", { body: "Đã đến hạn hoàn thành mục tiêu!" });
+            }
+          });
+        }
+      }
+    }
+
+    function dismissNotification() {
+      document.getElementById("notification").classList.add("hidden");
+    }
+
+    // Tạo ô ghi chú cho từng thứ
+    function createNotes() {
+      const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"];
+      const container = document.getElementById("noteContainer");
+      days.forEach((day, index) => {
+        const div = document.createElement("div");
+        div.className = "note";
+        div.innerHTML = `
+          <label>${day}</label>
+          <textarea id="note-${index}" placeholder="Ghi chú cho ${day}"></textarea>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function saveNotes() {
+      const notes = {};
+      for (let i = 0; i < 7; i++) {
+        notes[`note-${i}`] = document.getElementById(`note-${i}`).value;
+      }
+      localStorage.setItem("weeklyNotes", JSON.stringify(notes));
+      alert("Đã lưu ghi chú tuần!");
+    }
+
+    // Load lại dữ liệu khi mở app
+    window.onload = function () {
+      updateDateTime();
+      createNotes();
+
+      const history = localStorage.getItem("goalHistory");
+      if (history) {
+        document.querySelector("#goalHistory tbody").innerHTML = history;
+      }
+
+      const notes = JSON.parse(localStorage.getItem("weeklyNotes") || "{}");
+      for (let key in notes) {
+        if (document.getElementById(key)) {
+          document.getElementById(key).value = notes[key];
+        }
+      }
+
+      if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+      }
+    };
+  </script>
+</body>
+</html>
